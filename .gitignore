@@ -1,0 +1,18 @@
+# Ignorar ambiente local Conda
+env/
+
+# Ignorar arquivos temporários do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar arquivos de log
+*.log
+
+# Ignorar caches do Jupyter
+.ipynb_checkpoints/
+
+# Ignorar arquivos temporários do sistema
+.DS_Store
+Thumbs.db
