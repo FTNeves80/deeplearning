@@ -9,6 +9,8 @@ __pycache__/
 
 # Ignorar arquivos de log
 *.log
+*.xlsx
+*.xls
 
 # Ignorar caches do Jupyter
 .ipynb_checkpoints/
