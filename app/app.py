@@ -52,12 +52,11 @@ def load_mappings():
 # cacheia para não recarregar a cada clique
 
 def load_model():
-    # prioriza .keras; fallback .h5
-    candidates = [PATH_MODEL_DIR / "melhor_modelo.keras", PATH_MODEL_DIR / "melhor_modelo.h5"]
-    for c in candidates:
-        if c.exists():
-            return tf.keras.models.load_model(str(c))
-    raise FileNotFoundError("Modelo não encontrado em artifacts/model/ (melhor_modelo.keras ou .h5).")
+    model_path = PATH_MODEL_DIR / "modelo_total_dados_ULTIMO.keras"
+    if not model_path.exists():
+        raise FileNotFoundError(f"Modelo não encontrado: {model_path}")
+    print(f"[INFO] Carregando modelo: {model_path}")
+    return tf.keras.models.load_model(str(model_path))
 
 CATALOG = load_catalog()
 NAME_TO_PID = dict(zip(CATALOG["name"], CATALOG["product_id"]))
