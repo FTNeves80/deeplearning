@@ -21,26 +21,23 @@ def load_catalog() -> pd.DataFrame:
         if p.exists():
             df = pd.read_csv(p)
             cols = {c.lower(): c for c in df.columns}
-            name_col = cols.get("name") or cols.get("produto")
-            cat_col = cols.get("category") or cols.get("categoria")
-            price_col = cols.get("price") or cols.get("preco")
-            if not (name_col and cat_col and price_col):
-                break
-            df = df.rename(columns={name_col: "name", cat_col: "category", price_col: "price"})
-            return df[["name", "category", "price"]]
+            pid_col  = cols.get("product_id") or cols.get("codigo_produto")
+            name_col = cols.get("name")       or cols.get("descricao_produto")
+            cat_col  = cols.get("category")   or cols.get("categoria")
+            price_col= cols.get("price")      or cols.get("preco")
+            if not (pid_col and name_col and cat_col and price_col):
+                raise ValueError("CSV não tem as colunas esperadas (product_id, name, category, price)")
+            df = df.rename(columns={
+                pid_col: "product_id",
+                name_col: "name",
+                cat_col: "category",
+                price_col: "price",
+            })
+            df["product_id"] = df["product_id"].astype(int)
+            df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0.0)
+            return df[["product_id", "name", "category", "price"]]
 
-    # fallback (exemplo)
-    data = [
-        ["Cachorro-quente", "Lanche", 15.0],
-        ["Hambúrguer", "Lanche", 22.0],
-        ["Batata palha", "Acompanhamento", 6.0],
-        ["Batata frita", "Acompanhamento", 12.0],
-        ["Coca-Cola", "Bebida", 7.0],
-        ["Suco", "Bebida", 6.0],
-        ["Sorvete", "Sobremesa", 9.0],
-        ["Água", "Bebida", 4.0],
-    ]
-    return pd.DataFrame(data, columns=["name", "category", "price"])
+    raise FileNotFoundError("Nenhum catálogo encontrado em PATH_CATALOG")
 
 def load_mappings():
     with open(PATH_MAP_DIR / "product_to_int.json", "r", encoding="utf-8") as f:
@@ -63,6 +60,8 @@ def load_model():
     raise FileNotFoundError("Modelo não encontrado em artifacts/model/ (melhor_modelo.keras ou .h5).")
 
 CATALOG = load_catalog()
+NAME_TO_PID = dict(zip(CATALOG["name"], CATALOG["product_id"]))
+PID_TO_NAME = dict(zip(CATALOG["product_id"], CATALOG["name"]))
 MODEL = load_model()
 PRODUCT_TO_INT, INT_TO_PRODUCT, MAX_LEN = load_mappings()
 
@@ -82,32 +81,22 @@ def summarize(df_editor):
     return df, cart, n_items, subtotal
 
 def build_sequence_ids(cart: pd.DataFrame, max_len: int) -> np.ndarray:
-    """
-    Constrói sequência de tamanho fixo a partir do carrinho (sem ordem explícita).
-    Heurística: expandir por quantidade respeitando a ordem do catálogo.
-    Depois, truncar para os últimos max_len e pad com 0 à esquerda.
-    """
     seq = []
     for _, row in cart.iterrows():
         name = str(row["Produto"])
         q = int(row["Quantidade"])
-        pid = PRODUCT_TO_INT.get(name)
-        if pid is None:
-            # produto fora do vocabulário do modelo → ignora
+        codigo = NAME_TO_PID.get(name)                  # codigo_produto
+        pid_int = PRODUCT_TO_INT.get(str(codigo)) or PRODUCT_TO_INT.get(codigo)
+        if pid_int is None:
             continue
-        seq.extend([pid] * max(0, q))
+        seq.extend([pid_int] * max(0, q))
 
-    if len(seq) == 0:
+    if not seq:
         return np.zeros((1, max_len), dtype=np.float32)
-
-    # mantém os últimos max_len
     seq = seq[-max_len:]
-    # pad à esquerda com zeros
     if len(seq) < max_len:
         seq = [0] * (max_len - len(seq)) + seq
-
-    arr = np.array(seq, dtype=np.float32).reshape(1, max_len)  # modelo espera float32 (confirmado no smoke test)
-    return arr
+    return np.array(seq, dtype=np.float32).reshape(1, max_len)
 
 def predict_topk(df_editor, topk):
     df, cart, n_items, subtotal = summarize(df_editor)
@@ -125,11 +114,17 @@ def predict_topk(df_editor, topk):
 
     # ids presentes no carrinho
     for name in already:
-        pid = PRODUCT_TO_INT.get(name)
-        if pid is not None and 0 <= pid < len(scores):
-            mask[pid] = 0.0
+        codigo = NAME_TO_PID.get(name)
+        pid_int = PRODUCT_TO_INT.get(str(codigo)) or PRODUCT_TO_INT.get(codigo)
+        if pid_int is not None and 0 <= pid_int < len(scores):
+            mask[pid_int] = 0.0
 
+
+    mask[0] = 0.0              # PAD fora
     scores = scores * mask
+    s = scores.sum()
+    if s > 0:
+        scores = scores / s    # re-normaliza (igual ao notebook)
 
     # ordenar desc e pegar top-k válidos
     idx_sorted = np.argsort(scores)[::-1]
@@ -139,11 +134,14 @@ def predict_topk(df_editor, topk):
         if scores[idx] <= 0:
             continue
         # converter id → nome
-        name = INT_TO_PRODUCT.get(str(idx))
-        if not name:
+        codigo = INT_TO_PRODUCT.get(str(idx))
+        if codigo is None: 
             continue
-        out.append([name, float(scores[idx])])
-        if len(out) >= k:
+        nome = PID_TO_NAME.get(int(codigo))
+        if not nome:
+            continue
+        out.append([nome, float(scores[idx])])
+        if len(out) >= k:          # <- pare no Top-K
             break
 
     if not out:
@@ -184,18 +182,19 @@ with gr.Blocks(title="Pedidos • Recomendador") as demo:
     btn_suggest.click(fn=predict_topk, inputs=[editor, topk], outputs=[recs, summary])
     btn_clear.click(fn=on_clear, inputs=[editor], outputs=[editor])
 
-        # 🔽 Aqui entra o quadro que você pediu
+# 🔽 Aqui entra o quadro que você pediu
+
     gr.Markdown("---")
     gr.Markdown("### Trabalho de DeepLearning")
     gr.Markdown(
-        """
-        - Bruno Bersan  
-        - Ingrid Coda
-        - Leonardo Cunha
-        - Felipe Neves
-        - Cris Andrade
-        """
-    )
+            """
+            - Bruno Bersan  
+            - Ingrid Coda
+            - Leonardo Cunha
+            - Felipe Neves
+            - Cris Andrade
+            """
+        )
 
 if __name__ == "__main__":
     demo.launch()
