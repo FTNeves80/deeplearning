@@ -112,21 +112,3 @@ Se IDs começarem em 1 (em vez de 0), ajustar no app.py (offset).
 
 O products.csv deve usar os mesmos nomes que aparecem nos JSONs.
 
-👥 Equipe
-
-Trabalho de Deep Learning desenvolvido por:
-
-Bruno
-
-Ingrid
-
-Leonardo
-
-Felipe
-
-Cris
-
-
-👉 Agora sim, está tudo em **uma única caixa** para copiar e colar.  
-
-Quer que eu adicione no final um **passo extra** mostrando como exportar os JSONs a partir do notebook de treino (para ninguém esquecer quando for reproduzir)?

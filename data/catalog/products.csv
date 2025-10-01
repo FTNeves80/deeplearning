@@ -1,9 +1,11 @@
 product_id,name,category,price
-12,Cachorro-quente,Lanche,15.0
-45,Coca-Cola,Bebida,7.0
-78,Batata palha,Acompanhamento,6.0
-31,Batata frita,Acompanhamento,12.0
-22,Suco,Bebida,6.0
-9,Hambúrguer,Lanche,22.0
-41,Sorvete,Sobremesa,9.0
-5,Água,Bebida,4.0
+743,SACHE DE MAIONESE,Acompanhamento,2.0
+712,DOGAO 1,Lanche,15.0
+725,AMERICANO,Lanche,18.0
+711,SALADA,Lanche,14.0
+715,BACON,Extra,5.0
+752,CONTI COLA 2 LITROS,Bebida,10.0
+718,DOGAO 2,Lanche,17.0
+714,TUDO,Lanche,20.0
+729,DOG ESPECIAL PH,Lanche,22.0
+726,BURG,Lanche,16.0
